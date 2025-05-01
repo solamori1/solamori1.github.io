@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microplastics - Ocean Surface</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #ocean-surface {
+            height: 300vh;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sky {
+            height: 70vh;
+            background: linear-gradient(to bottom, #B0E0E6, #D4F1F4);
+            position: relative;
+        }
+
+        .water {
+            height: 230vh;
+            background: linear-gradient(to bottom, #76D7C4, #0A1B2F);
+            position: relative;
+        }
+
+        .waves {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 15vh;
+            min-height: 100px;
+            max-height: 150px;
+        }
+
+        .parallax > use {
+            animation: move-forever 25s cubic-bezier(.55,.5,.45,.5) infinite;
+        }
+        .parallax > use:nth-child(1) {
+            animation-delay: -2s;
+            animation-duration: 7s;
+        }
+        .parallax > use:nth-child(2) {
+            animation-delay: -3s;
+            animation-duration: 10s;
+        }
+        .parallax > use:nth-child(3) {
+            animation-delay: -4s;
+            animation-duration: 13s;
+        }
+        .parallax > use:nth-child(4) {
+            animation-delay: -5s;
+            animation-duration: 20s;
+        }
+        @keyframes move-forever {
+            0% { transform: translate3d(-90px,0,0); }
+            100% { transform: translate3d(85px,0,0); }
+        }
+
+        .fish {
+            width: 100px;
+            height: 100;
+        }
+
+        .pollution {
+            width: 100;
+            height: 100;
+        }
+
+        .fish, .pollution {
+            position: absolute;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 70px;
+        }
+
+        .glow {
+            text-shadow: #fc0 1px 0 10px;
+        }
+
+        .speech-bubble {
+            position: absolute;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            width: 150px;
+            text-align: center;
+            white-space: normal;
+            z-index: 100;
+            font-size: 14px;
+            text-shadow: initial;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 10px solid white;
+        }
+
+        @media (max-width: 768px) {
+            .waves {
+                height: 40px;
+                min-height: 40px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <section id="ocean-surface">
+        <div class="sky">
+            <svg class="waves" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                viewBox="0 24 150 28" preserveAspectRatio="none" shape-rendering="auto">
+                <defs>
+                    <path id="gentle-wave" d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18 v44h-352z" />
+                </defs>
+                <g class="parallax">
+                    <use xlink:href="#gentle-wave" x="48" y="0" fill="rgba(118, 215, 196, 0.7)" />
+                    <use xlink:href="#gentle-wave" x="48" y="3" fill="rgba(118, 215, 196, 0.5)" />
+                    <use xlink:href="#gentle-wave" x="48" y="5" fill="rgba(118, 215, 196, 0.3)" />
+                    <use xlink:href="#gentle-wave" x="48" y="7" fill="#76D7C4" />
+                </g>
+            </svg>
+        </div>
+        <div class="water" id="water-canvas"></div>
+    </section>
+
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
+    <script>
+        let particles = [];
+        let elements = [];
+        let activeElement = null;
+        const fishFacts = [
+            "Microplastics are tiny plastic particles less than 5mm in size.",
+            "They can be found in many everyday products like cosmetics and cleaning agents.",
+            "Microplastics in the ocean can be ingested by marine life, entering the food chain.",
+            "They are difficult to remove from the environment once they are present.",
+            "Microplastics can absorb and carry pollutants, making them even more harmful."
+        ];
+        const pollutionFacts = [
+            "Avoid products with microbeads, like certain exfoliating scrubs and toothpastes.",
+            "Choose natural fiber clothing over synthetic ones to reduce microfiber shedding.",
+            "Use a washing machine filter or laundry ball to capture microfibers from clothes.",
+            "Support policies and companies that promote plastic reduction and recycling.",
+            "Educate others about the impact of microplastics and how to reduce their use."
+        ];
+
+        function setup() {
+            let canvas = createCanvas(windowWidth, select('.water').height);
+            canvas.parent('water-canvas');
+            noiseSeed(random(1000));
+            for (let i = 0; i < 1000; i++) {
+                particles.push(new Particle());
+            }
+            setupElements();
+        }
+
+        function draw() {
+            clear();
+            let scrollY = window.scrollY;
+            let maxScroll = document.body.scrollHeight - window.innerHeight;
+            let scrollFraction = scrollY / maxScroll;
+            let particleDensity = map(scrollFraction, 0, 1, 0, 1000);
+
+            for (let i = 0; i < particleDensity; i++) {
+                particles[i].update();
+                particles[i].show();
+            }
+
+            updateElements();
+        }
+
+        class Particle {
+            constructor() {
+                this.x = random(width);
+                this.y = random(height);
+                this.vx = random(-0.5, 0.5);
+                this.vy = random(-0.5, 0.5);
+                this.size = random(2, 5);
+                this.alpha = random(50, 150);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+
+            show() {
+                noStroke();
+                fill(255, 255, 255, this.alpha);
+                ellipse(this.x, this.y, this.size);
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, select('.water').height);
+        }
+
+        function setupElements() {
+            const waterDiv = document.querySelector('.water');
+            const numFish = 20;
+            const numPollution = 20;
+            const fishEmojis = ['🐟', '🐠', '🐡'];
+            const pollutionEmojis = ['👟', '🍼', '🧃'];
+
+            for (let i = 0; i < numFish + numPollution; i++) {
+                const depth = Math.random();
+                let isFish;
+
+                if (depth < 0.1) {
+                    isFish = true;
+                } else if (depth > 0.9) {
+                    isFish = false;
+                } else {
+                    const fishProbability = 1 - (depth - 0.1) / 0.8;
+                    isFish = Math.random() < fishProbability;
+                }
+
+                const element = document.createElement('div');
+                element.className = isFish ? 'fish' : 'pollution';
+                const left = Math.random() * 100;
+                const topVh = depth * 230;
+                element.style.left = `${left}%`;
+                element.style.top = `${topVh}vh`;
+                element.dataset.x = left * window.innerWidth / 100;
+                element.dataset.y = topVh * window.innerHeight / 100;
+                element.dataset.vx = 0;
+                element.dataset.vy = 0;
+                element.dataset.noiseOffsetX = Math.random() * 100;
+                element.dataset.noiseOffsetY = Math.random() * 100;
+                element.dataset.maxSpeed = isFish ? random(2, 3) : random(0.5, 1);
+                element.dataset.verticalRange = isFish ? 60 : 20;
+                element.dataset.isStopped = 'false';
+                waterDiv.appendChild(element);
+                elements.push(element);
+
+                if (isFish) {
+                    element.innerHTML = fishEmojis[Math.floor(Math.random() * fishEmojis.length)];
+                    const fact = fishFacts[Math.floor(Math.random() * fishFacts.length)];
+                    element.dataset.fact = fact;
+                } else {
+                    element.innerHTML = pollutionEmojis[Math.floor(Math.random() * pollutionEmojis.length)];
+                    const fact = pollutionFacts[Math.floor(Math.random() * pollutionFacts.length)];
+                    element.dataset.fact = fact;
+                }
+
+                element.addEventListener('click', function(event) {
+                    if (event.target === this) {
+                        if (this.dataset.isStopped === 'true') {
+                            this.dataset.isStopped = 'false';
+                            this.classList.remove('glow');
+                            if (this.bubble) {
+                                this.bubble.remove();
+                                this.bubble = null;
+                            }
+                            activeElement = null;
+                        } else {
+                            if (activeElement && activeElement !== this) {
+                                activeElement.dataset.isStopped = 'false';
+                                activeElement.classList.remove('glow');
+                                if (activeElement.bubble) {
+                                    activeElement.bubble.remove();
+                                    activeElement.bubble = null;
+                                }
+                            }
+                            this.dataset.isStopped = 'true';
+                            this.classList.add('glow');
+                            const bubble = document.createElement('div');
+                            bubble.className = 'speech-bubble';
+                            bubble.innerText = this.dataset.fact;
+                            this.appendChild(bubble);
+                            this.bubble = bubble;
+                            bubble.style.position = 'absolute';
+                            bubble.style.left = '50%';
+                            bubble.style.bottom = '100%';
+                            bubble.style.transform = 'translateX(-50%)';
+                            activeElement = this;
+                        }
+                    }
+                });
+            }
+
+            document.addEventListener('click', function(event) {
+                if (activeElement && !activeElement.contains(event.target)) {
+                    activeElement.dataset.isStopped = 'false';
+                    activeElement.classList.remove('glow');
+                    if (activeElement.bubble) {
+                        activeElement.bubble.remove();
+                        activeElement.bubble = null;
+                    }
+                    activeElement = null;
+                }
+            });
+        }
+
+        function updateElements() {
+            const waterWidth = window.innerWidth;
+            const waterHeight = select('.water').height;
+
+            elements.forEach(element => {
+                const isFish = element.className === 'fish';
+                const maxSpeed = parseFloat(element.dataset.maxSpeed);
+                const verticalRange = parseFloat(element.dataset.verticalRange);
+                const noiseOffsetX = parseFloat(element.dataset.noiseOffsetX);
+                const noiseOffsetY = parseFloat(element.dataset.noiseOffsetY);
+                const noiseTime = frameCount * 0.01;
+
+                if (element.dataset.isStopped !== 'true') {
+                    const nx = (noise(noiseOffsetX + noiseTime) - 0.5) * 2;
+                    const ny = (noise(noiseOffsetY + noiseTime) - 0.5) * 2;
+                    let vx = parseFloat(element.dataset.vx) * 0.9 + nx * 0.2;
+                    let vy = parseFloat(element.dataset.vy) * 0.9 + ny * 0.1;
+                    const speed = Math.sqrt(vx * vx + vy * vy);
+                    if (speed > maxSpeed) {
+                        const scale = maxSpeed / speed;
+                        vx *= scale;
+                        vy *= scale;
+                    }
+                    if (frameCount % 600 === 0) {
+                        vx *= 0.5;
+                        vy *= 0.5;
+                    }
+                    element.dataset.vx = vx;
+                    element.dataset.vy = vy;
+                }
+
+                const x = parseFloat(element.dataset.x);
+                const y = parseFloat(element.dataset.y);
+                const elementWidth = isFish ? 100 : 50;
+                const elementHeight = isFish ? 50 : 50;
+                let newX = x + parseFloat(element.dataset.vx);
+                let newY = y + parseFloat(element.dataset.vy);
+
+                if (newX < 0) {
+                    newX = 0;
+                    element.dataset.vx = -parseFloat(element.dataset.vx) * 0.8;
+                } else if (newX > waterWidth - elementWidth) {
+                    newX = waterWidth - elementWidth;
+                    element.dataset.vx = -parseFloat(element.dataset.vx) * 0.8;
+                }
+                if (newY < 0) {
+                    newY = 0;
+                    element.dataset.vy = -parseFloat(element.dataset.vy) * 0.8;
+                } else if (newY > waterHeight - elementHeight) {
+                    newY = waterHeight - elementHeight;
+                    element.dataset.vy = -parseFloat(element.dataset.vy) * 0.8;
+                }
+
+                const initialY = (parseFloat(element.style.top) / 230) * waterHeight;
+                newY = constrain(newY, initialY - verticalRange, initialY + verticalRange);
+
+                element.dataset.x = newX;
+                element.dataset.y = newY;
+                element.style.left = `${newX / waterWidth * 100}%`;
+                element.style.top = `${newY / waterHeight * 230}vh`;
+            });
+        }
+    </script>
+</body>
+</html>
