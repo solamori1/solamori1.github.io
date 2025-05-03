@@ -63,12 +63,13 @@
 
         .fish {
             width: 100px;
-            height: 100;
+            height: 100px;
+            transition: transform 0.3s ease; /* Smooth flip animation */
         }
 
         .pollution {
-            width: 100;
-            height: 100;
+            width: 100px;
+            height: 100px;
         }
 
         .fish, .pollution {
@@ -111,10 +112,104 @@
             border-top: 10px solid white;
         }
 
+        .speech-bubble button {
+            display: block;
+            margin: 10px auto 0;
+            padding: 5px 10px;
+            background-color: #76D7C4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .intro {
+            position: absolute;
+            top: 15vh;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            animation: fadeIn 2s ease-in;
+        }
+
+        .intro h1 {
+            font-size: 3em;
+            margin: 0;
+        }
+
+        .intro p {
+            font-size: 1.5em;
+            margin: 30px 0;
+        }
+
+        #dive-in {
+            padding: 15px 30px;
+            font-size: 1.2em;
+            background-color: #76D7C4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+
+        #dive-in:hover {
+            transform: scale(1.1);
+            background-color: #5ab8a3;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+
+        .popup-content {
+            position: relative;
+            z-index: 2;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #close-popup {
+            padding: 10px 20px;
+            background-color: #76D7C4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
         @media (max-width: 768px) {
             .waves {
                 height: 40px;
                 min-height: 40px;
+            }
+            .intro h1 {
+                font-size: 2em;
+            }
+            .intro p {
+                font-size: 1.2em;
+            }
+            #dive-in {
+                padding: 10px 20px;
+                font-size: 1em;
             }
         }
     </style>
@@ -122,6 +217,11 @@
 <body>
     <section id="ocean-surface">
         <div class="sky">
+            <div class="intro">
+                <h1>Explore the Impact of Microplastics</h1>
+                <p>Click on fish to learn what microplastics are and how they affect the world around us.<br>Click on pollution to clean up the ocean by learning to reduce your own microplastic consumption!</p>
+                <button id="dive-in">Dive In</button>
+            </div>
             <svg class="waves" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                 viewBox="0 24 150 28" preserveAspectRatio="none" shape-rendering="auto">
                 <defs>
@@ -137,12 +237,21 @@
         </div>
         <div class="water" id="water-canvas"></div>
     </section>
+    <div id="popup">
+        <div class="popup-content">
+            <h2>Congratulations!</h2>
+            <p>You've cleaned up all the pollution!</p>
+            <button id="close-popup">Close</button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/p5@1.4.0/lib/p5.js"></script>
     <script>
         let particles = [];
         let elements = [];
         let activeElement = null;
+        let pollutionCount = 0;
+        let initialPollutionCount;
         const fishFacts = [
           "Microplastics are tiny plastic particles less than 5 millimeters in size.",
           "Microplastics can be found in oceans, rivers, and lakes worldwide.",
@@ -202,10 +311,11 @@
             clear();
             let scrollY = window.scrollY;
             let maxScroll = document.body.scrollHeight - window.innerHeight;
-            let scrollFraction = scrollY / maxScroll;
-            let particleDensity = map(scrollFraction, 0, 1, 0, 1000);
+            let scrollFraction = Math.max(0, Math.min(scrollY / maxScroll, 1));
+            let factor = initialPollutionCount > 0 ? pollutionCount / initialPollutionCount : 0;
+            let numParticles = Math.floor(scrollFraction * particles.length * factor);
 
-            for (let i = 0; i < particleDensity; i++) {
+            for (let i = 0; i < numParticles; i++) {
                 particles[i].update();
                 particles[i].show();
             }
@@ -236,6 +346,67 @@
                 ellipse(this.x, this.y, this.size);
             }
         }
+
+        class ConfettiParticle {
+            constructor(p) {
+                this.p = p;
+                this.x = p.random(p.width);
+                this.y = p.random(-100, 0);
+                this.vx = p.random(-1, 1);
+                this.vy = p.random(1, 3);
+                this.size = p.random(5, 10);
+                this.color = p.color(p.random(255), p.random(255), p.random(255), 150);
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+            }
+
+            show() {
+                this.p.noStroke();
+                this.p.fill(this.color);
+                this.p.rect(this.x, this.y, this.size, this.size);
+            }
+
+            isOffScreen() {
+                return this.y > this.p.height;
+            }
+        }
+
+        let confettiSketch = function(p) {
+            let confettiParticles = [];
+            p.setup = function() {
+                let canvas = p.createCanvas(window.innerWidth, window.innerHeight);
+                canvas.parent('popup');
+                canvas.position(0, 0);
+                canvas.style('z-index', '3');
+                canvas.style('pointer-events', 'none');
+            };
+            p.draw = function() {
+                p.clear();
+                for (let i = confettiParticles.length - 1; i >= 0; i--) {
+                    confettiParticles[i].update();
+                    confettiParticles[i].show();
+                    if (confettiParticles[i].isOffScreen()) {
+                        confettiParticles.splice(i, 1);
+                    }
+                }
+            };
+            p.startConfetti = function() {
+                for (let i = 0; i < 100; i++) {
+                    confettiParticles.push(new ConfettiParticle(p));
+                }
+            };
+            p.clearConfetti = function() {
+                confettiParticles = [];
+            };
+            p.windowResized = function() {
+                p.resizeCanvas(window.innerWidth, window.innerHeight);
+            };
+        };
+
+        let confettiP5 = new p5(confettiSketch);
 
         function windowResized() {
             resizeCanvas(windowWidth, select('.water').height);
@@ -287,6 +458,7 @@
                     element.innerHTML = pollutionEmojis[Math.floor(Math.random() * pollutionEmojis.length)];
                     const fact = pollutionFacts[Math.floor(Math.random() * pollutionFacts.length)];
                     element.dataset.fact = fact;
+                    pollutionCount++;
                 }
 
                 element.addEventListener('click', function(event) {
@@ -312,18 +484,43 @@
                             this.classList.add('glow');
                             const bubble = document.createElement('div');
                             bubble.className = 'speech-bubble';
-                            bubble.innerText = this.dataset.fact;
+                            const factParagraph = document.createElement('p');
+                            factParagraph.innerText = this.dataset.fact;
+                            bubble.appendChild(factParagraph);
+                            if (this.classList.contains('pollution')) {
+                                const cleanUpButton = document.createElement('button');
+                                cleanUpButton.innerText = 'Clean Up';
+                                cleanUpButton.addEventListener('click', function() {
+                                    const pollutionElement = this.parentElement.parentElement;
+                                    pollutionElement.remove();
+                                    const index = elements.indexOf(pollutionElement);
+                                    if (index > -1) {
+                                        elements.splice(index, 1);
+                                    }
+                                    if (activeElement === pollutionElement) {
+                                        activeElement = null;
+                                    }
+                                    pollutionCount--;
+                                    if (pollutionCount === 0) {
+                                        confettiP5.startConfetti();
+                                        showPopup();
+                                    }
+                                });
+                                bubble.appendChild(cleanUpButton);
+                            }
                             this.appendChild(bubble);
                             this.bubble = bubble;
                             bubble.style.position = 'absolute';
                             bubble.style.left = '50%';
                             bubble.style.bottom = '100%';
-                            bubble.style.transform = 'translateX(-50%)';
+                            bubble.style.transform = this.style.transform === 'scaleX(-1)' ? 'translateX(-50%) scaleX(-1)' : 'translateX(-50%)';
                             activeElement = this;
                         }
                     }
                 });
             }
+
+            initialPollutionCount = pollutionCount;
 
             document.addEventListener('click', function(event) {
                 if (activeElement && !activeElement.contains(event.target)) {
@@ -398,8 +595,39 @@
                 element.dataset.y = newY;
                 element.style.left = `${newX / waterWidth * 100}%`;
                 element.style.top = `${newY / waterHeight * 230}vh`;
+
+                // Make fish face the direction of movement
+                if (isFish) {
+                    const vx = parseFloat(element.dataset.vx);
+                    if (vx > 0) {
+                        element.style.transform = 'scaleX(-1)';
+                    } else {
+                        element.style.transform = 'scaleX(1)';
+                    }
+                    // Update speech bubble transform if it exists
+                    if (element.bubble) {
+                        element.bubble.style.transform = element.style.transform === 'scaleX(-1)' ? 'translateX(-50%) scaleX(-1)' : 'translateX(-50%)';
+                    }
+                }
             });
         }
+
+        function showPopup() {
+            document.getElementById('popup').style.display = 'flex';
+        }
+
+        document.getElementById('close-popup').addEventListener('click', function() {
+            document.getElementById('popup').style.display = 'none';
+            confettiP5.clearConfetti();
+        });
+
+        document.getElementById('dive-in').addEventListener('click', function() {
+            const waterDiv = document.querySelector('.water');
+            window.scrollTo({
+                top: waterDiv.offsetTop,
+                behavior: 'smooth'
+            });
+        });
     </script>
 </body>
 </html>
